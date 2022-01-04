@@ -185,6 +185,7 @@ test "invalid outcome cause" {
     }
 }
 
+/// Requires an outcome to be valid, throws a compile-time error otherwise
 pub fn require(comptime outcome: Outcome) void {
     if (outcome == .Invalid) {
         const err = std.fmt.comptimePrint(
@@ -195,6 +196,16 @@ pub fn require(comptime outcome: Outcome) void {
     }
 }
 
+/// Requires an outcome to be valid, throws a compile-time error otherwise
+///
+/// Used in function signatures:
+///
+/// ```
+/// fn signature_contract(t: anytype) contracts.RequiresAndReturns(
+///     contracts.is(@TypeOf(t), u8),
+///     void,
+/// ) {}
+/// ```
 pub fn RequiresAndReturns(outcome: Outcome, comptime T: type) type {
     require(outcome);
     return T;
