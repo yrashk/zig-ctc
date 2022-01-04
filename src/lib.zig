@@ -37,6 +37,7 @@
 //! ```
 
 const std = @import("std");
+const expect = std.testing.expect;
 
 pub const OutcomeTag = enum {
     Valid,
@@ -47,7 +48,13 @@ pub const Identifier = []const u8;
 
 pub const Invalid = struct {
     identifier: Identifier,
+
+    /// outcomes that caused this outcome to be invalid
+    /// (primarily concerns composite outcomes)
     causes: []const Outcome = &[0]Outcome{},
+
+    /// reason for violation
+    reason: []const u8 = "",
 
     /// Returns the first outcome that causes this outcome's failure
     pub fn cause(comptime self: @This()) Outcome {
@@ -111,24 +118,6 @@ pub const Outcome = union(OutcomeTag) {
     }
 };
 
-/// Creates a new Outcome that requires type `T` to be the same type as `T1`
-pub fn is(comptime T: type, comptime T1: type) Outcome {
-    return Outcome.init(T == T1, Invalid{
-        .identifier = std.fmt.comptimePrint("is({}, {})", .{ T, T1 }),
-    });
-}
-
-const expect = std.testing.expect;
-
-test "is" {
-    comptime {
-        try expect(is(u8, u8) == .Valid);
-        try expect(is(u8, u16) == .Invalid);
-        try expect(std.mem.eql(u8, "is(u8, u16)", is(u8, u16).identifier()));
-        try expect(is(u8, u16).Invalid.causes.len == 0);
-    }
-}
-
 test "andAlso" {
     comptime {
         const T = u8;
@@ -182,6 +171,42 @@ test "invalid outcome cause" {
         const nested = (Outcome{ .Valid = "1" })
             .andAlso((Outcome{ .Valid = "2" }).andAlso(Outcome{ .Invalid = .{ .identifier = "3" } }));
         try expect(std.mem.eql(u8, "3", nested.Invalid.cause().identifier()));
+    }
+}
+
+/// Creates a new Outcome that requires type `T` to be the same type as `T1`
+pub fn is(comptime T: type, comptime T1: type) Outcome {
+    return Outcome.init(T == T1, Invalid{
+        .identifier = std.fmt.comptimePrint("is({}, {})", .{ T, T1 }),
+    });
+}
+
+test "is" {
+    comptime {
+        try expect(is(u8, u8) == .Valid);
+        try expect(is(u8, u16) == .Invalid);
+        try expect(std.mem.eql(u8, "is(u8, u16)", is(u8, u16).identifier()));
+        try expect(is(u8, u16).Invalid.causes.len == 0);
+    }
+}
+
+/// Creates a new Outcome that requires that type `T` has to be of a certain
+/// type (as in .Struct, .Int, etc.)
+///
+/// Includes violation reason into `Invalid.reason`
+pub fn isType(comptime T: type, type_id: std.builtin.TypeId) Outcome {
+    return Outcome.init(@typeInfo(T) == type_id, Invalid{
+        .identifier = std.fmt.comptimePrint("isType({}, .{s})", .{ T, @tagName(type_id) }),
+        .reason = std.fmt.comptimePrint("got .{s}", .{@tagName(@typeInfo(T))}),
+    });
+}
+
+test "isType" {
+    comptime {
+        try expect(isType(struct {}, .Struct) == .Valid);
+        try expect(isType(u8, .Struct) == .Invalid);
+        try expect(std.mem.eql(u8, "got .Int", isType(u8, .Struct).Invalid.reason));
+        try expect(std.mem.eql(u8, "isType(u8, .Struct)", isType(u8, .Struct).identifier()));
     }
 }
 
