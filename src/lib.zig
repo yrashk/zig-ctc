@@ -101,7 +101,7 @@ pub const Outcome = union(OutcomeTag) {
         }
     }
 
-    /// Create a new Outcome that is requires both `self` and `t` to be valid
+    /// A contract that is requires both `self` and `t` to be valid
     pub fn andAlso(comptime self: @This(), comptime t: @This()) @This() {
         return @This().init(self == .Valid and t == .Valid, Invalid{
             .identifier = std.fmt.comptimePrint("{s}.andAlso({s})", .{ self.identifier(), t.identifier() }),
@@ -109,7 +109,7 @@ pub const Outcome = union(OutcomeTag) {
         });
     }
 
-    /// Create a new Outcome that is requires either `self` or `t` to be valid
+    /// A contract that is requires either `self` or `t` to be valid
     pub fn orElse(comptime self: @This(), comptime t: @This()) @This() {
         return @This().init(self == .Valid or t == .Valid, Invalid{
             .identifier = std.fmt.comptimePrint("{s}.orElse({s})", .{ self.identifier(), t.identifier() }),
@@ -174,7 +174,7 @@ test "invalid outcome cause" {
     }
 }
 
-/// Creates a new Outcome that requires type `T` to be the same type as `T1`
+/// A contract that requires type `T` to be the same type as `T1`
 pub fn is(comptime T: type, comptime T1: type) Outcome {
     return Outcome.init(T == T1, Invalid{
         .identifier = std.fmt.comptimePrint("is({}, {})", .{ T, T1 }),
@@ -190,7 +190,7 @@ test "is" {
     }
 }
 
-/// Creates a new Outcome that requires that type `T` has to be of a certain
+/// A contract that requires that type `T` has to be of a certain
 /// type (as in .Struct, .Int, etc.)
 ///
 /// Includes violation reason into `Invalid.reason`
