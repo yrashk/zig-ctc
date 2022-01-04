@@ -54,7 +54,7 @@ pub const Invalid = struct {
     causes: []const Outcome = &[0]Outcome{},
 
     /// reason for violation
-    reason: []const u8 = "",
+    reason: []const u8 = "none given",
 
     /// Returns the first outcome that causes this outcome's failure
     pub fn cause(comptime self: @This()) Outcome {
@@ -214,8 +214,12 @@ test "isType" {
 pub fn require(comptime outcome: Outcome) void {
     if (outcome == .Invalid) {
         const err = std.fmt.comptimePrint(
-            "requirement failure in {s}, cause: {s}",
-            .{ outcome.identifier(), outcome.Invalid.cause().identifier() },
+            "requirement failure in {s}, cause: {s} (reason: {s})",
+            .{
+                outcome.identifier(),
+                outcome.Invalid.cause().identifier(),
+                outcome.Invalid.reason,
+            },
         );
         @compileError(err);
     }
