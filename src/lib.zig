@@ -86,23 +86,21 @@ pub const Outcome = union(OutcomeTag) {
     }
 
     fn collectFailures(comptime t1: @This(), comptime t2: @This()) []const @This() {
-        comptime {
-            var n: usize = 0;
-            if (t1 == .Invalid) n += 1;
-            if (t2 == .Invalid) n += 1;
+        var n: usize = 0;
+        if (t1 == .Invalid) n += 1;
+        if (t2 == .Invalid) n += 1;
 
-            var causes: [n]@This() = [_]@This(){undefined} ** n;
+        var causes: [n]@This() = [_]@This(){undefined} ** n;
 
-            var i: usize = 0;
-            if (t1 == .Invalid) {
-                causes[i] = t1;
-                i += 1;
-            }
-            if (t2 == .Invalid) {
-                causes[i] = t2;
-            }
-            return &causes;
+        var i: usize = 0;
+        if (t1 == .Invalid) {
+            causes[i] = t1;
+            i += 1;
         }
+        if (t2 == .Invalid) {
+            causes[i] = t2;
+        }
+        return &causes;
     }
 
     /// A contract that is requires both `self` and `t` to be valid
