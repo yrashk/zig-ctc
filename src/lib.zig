@@ -352,7 +352,7 @@ pub fn hasDecl(comptime T: type, name: []const u8) Outcome {
     require(isType(T, .Struct).orElse(isType(T, .Enum).orElse(isType(T, .Union).orElse(isType(T, .Opaque)))));
 
     return Outcome.init(@hasDecl(T, name), Invalid{
-        .identifier = std.fmt.comptimePrint("hasDecl({}, .{s})", .{ T, name }),
+        .identifier = std.fmt.comptimePrint("hasDecl({}, {s})", .{ T, name }),
     });
 }
 
