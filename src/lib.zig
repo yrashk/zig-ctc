@@ -39,11 +39,6 @@
 const std = @import("std");
 const expect = std.testing.expect;
 
-pub const OutcomeTag = enum {
-    Valid,
-    Invalid,
-};
-
 pub const Identifier = []const u8;
 
 pub const Invalid = struct {
@@ -69,7 +64,7 @@ pub const Invalid = struct {
 };
 
 /// Outcome of a contract
-pub const Outcome = union(OutcomeTag) {
+pub const Outcome = union(enum) {
     Valid: Identifier,
     Invalid: Invalid,
 
