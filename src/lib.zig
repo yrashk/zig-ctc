@@ -103,7 +103,7 @@ pub const Outcome = union(OutcomeTag) {
         return &causes;
     }
 
-    /// A contract that is requires both `self` and `t` to be valid
+    /// A contract that requires both `self` and `t` to be valid
     pub fn andAlso(comptime self: @This(), comptime t: @This()) @This() {
         return @This().init(self == .Valid and t == .Valid, Invalid{
             .identifier = std.fmt.comptimePrint("{s}.andAlso({s})", .{ self.identifier(), t.identifier() }),
@@ -111,7 +111,7 @@ pub const Outcome = union(OutcomeTag) {
         });
     }
 
-    /// A contract that is requires either `self` or `t` to be valid
+    /// A contract that requires either `self` or `t` to be valid
     pub fn orElse(comptime self: @This(), comptime t: @This()) @This() {
         return @This().init(self == .Valid or t == .Valid, Invalid{
             .identifier = std.fmt.comptimePrint("{s}.orElse({s})", .{ self.identifier(), t.identifier() }),
