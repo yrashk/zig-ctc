@@ -236,11 +236,12 @@ test "isType" {
 pub fn require(comptime outcome: Outcome) void {
     if (outcome == .Invalid) {
         const err = std.fmt.comptimePrint(
-            "requirement failure in {s}, cause: {s} (reason: {s})",
+            "requirement failure in {s} (reason: {s}), cause: {s} (reason: {s})",
             .{
                 outcome.identifier(),
-                outcome.Invalid.cause().identifier(),
                 outcome.Invalid.reason,
+                outcome.Invalid.cause().identifier(),
+                outcome.Invalid.cause().Invalid.reason,
             },
         );
         @compileError(err);
