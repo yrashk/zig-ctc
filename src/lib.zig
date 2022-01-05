@@ -235,15 +235,25 @@ test "isType" {
 /// Requires an outcome to be valid, throws a compile-time error otherwise
 pub fn require(comptime outcome: Outcome) void {
     if (outcome == .Invalid) {
-        const err = std.fmt.comptimePrint(
-            "requirement failure in {s} (reason: {s}), cause: {s} (reason: {s})",
-            .{
-                outcome.identifier(),
-                outcome.Invalid.reason,
-                outcome.Invalid.cause().identifier(),
-                outcome.Invalid.cause().Invalid.reason,
-            },
-        );
+        const err = if (std.mem.eql(u8, outcome.identifier(), outcome.Invalid.cause().identifier()) and
+            std.mem.eql(u8, outcome.Invalid.reason, outcome.Invalid.cause().Invalid.reason))
+            std.fmt.comptimePrint(
+                "requirement failure in {s} (reason: {s})",
+                .{
+                    outcome.identifier(),
+                    outcome.Invalid.reason,
+                },
+            )
+        else
+            std.fmt.comptimePrint(
+                "requirement failure in {s} (reason: {s}), cause: {s} (reason: {s})",
+                .{
+                    outcome.identifier(),
+                    outcome.Invalid.reason,
+                    outcome.Invalid.cause().identifier(),
+                    outcome.Invalid.cause().Invalid.reason,
+                },
+            );
         @compileError(err);
     }
 }
