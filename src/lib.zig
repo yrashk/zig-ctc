@@ -60,7 +60,11 @@ pub const Invalid = struct {
     pub fn cause(comptime self: @This()) Outcome {
         if (self.causes.len > 0)
             return self.causes[0].Invalid.cause();
-        return Outcome.init(false, Invalid{ .identifier = self.identifier });
+        return Outcome.init(false, Invalid{
+            .identifier = self.identifier,
+            .reason = self.reason,
+            .causes = self.causes,
+        });
     }
 };
 
@@ -180,10 +184,19 @@ test "invalid outcome cause" {
             is(T, u16).identifier(),
             outcome.Invalid.cause().identifier(),
         ));
+        try expect(std.mem.eql(
+            u8,
+            outcome.Invalid.reason,
+            outcome.Invalid.cause().Invalid.reason,
+        ));
+
+        const custom_reason = Outcome{ .Invalid = .{ .identifier = "custom", .reason = "custom" } };
+        try expect(std.mem.eql(u8, custom_reason.Invalid.reason, custom_reason.Invalid.cause().Invalid.reason));
 
         const nested = (Outcome{ .Valid = "1" })
-            .andAlso((Outcome{ .Valid = "2" }).andAlso(Outcome{ .Invalid = .{ .identifier = "3" } }));
+            .andAlso((Outcome{ .Valid = "2" }).andAlso(Outcome{ .Invalid = .{ .identifier = "3", .reason = "special" } }));
         try expect(std.mem.eql(u8, "3", nested.Invalid.cause().identifier()));
+        try expect(std.mem.eql(u8, "special", nested.Invalid.cause().Invalid.reason));
     }
 }
 
