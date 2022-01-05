@@ -116,6 +116,19 @@ pub const Outcome = union(OutcomeTag) {
             .causes = Outcome.collectFailures(t, self),
         });
     }
+
+    /// Gives an outcome a new identifier, wrapping the original outcome as a cause
+    ///
+    /// Useful for creating named contracts that compose other contracts together
+    ///
+    /// ```
+    /// pub fn isMyThing(compile T: type) contracts.Outcome {
+    ///     return contracts.isType(T, .Struct).named("isMyThing");
+    /// }
+    /// ```
+    pub fn named(comptime self: @This(), identifier_: []const u8) @This() {
+        return @This().init(self == .Valid, Invalid{ .identifier = identifier_, .causes = &[1]Outcome{self} });
+    }
 };
 
 test "andAlso" {
@@ -171,6 +184,15 @@ test "invalid outcome cause" {
         const nested = (Outcome{ .Valid = "1" })
             .andAlso((Outcome{ .Valid = "2" }).andAlso(Outcome{ .Invalid = .{ .identifier = "3" } }));
         try expect(std.mem.eql(u8, "3", nested.Invalid.cause().identifier()));
+    }
+}
+
+test "Outcome.named" {
+    comptime {
+        const outcome = is(u8, u16).named("contract");
+        try expect(outcome == .Invalid);
+        try expect(std.mem.eql(u8, "contract", outcome.identifier()));
+        try expect(std.mem.eql(u8, "is(u8, u16)", outcome.Invalid.cause().identifier()));
     }
 }
 
