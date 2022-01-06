@@ -133,20 +133,9 @@ pub const Outcome = union(enum) {
         });
     }
 
-    fn isThenContract(comptime Then: type) @This() {
-        // This contract does not use `andThen` to avoid infinite recursion
-        const contract = isType(Then, .Struct)
-            .andAlso(hasDecl(Then, "then"));
-        return contract.named(std.fmt.comptimePrint(
-            "isThenContract({s})",
-            .{@typeName(Then)},
-        ));
-    }
-
     /// A contract that requires `self` to be valid and if it is, the
     /// contract returned by Then.then() has to be valid as well
     pub fn andThen(comptime self: @This(), comptime Then: type) @This() {
-        require(isThenContract(Then));
         if (self == .Invalid)
             return self.clone();
         return Then.then().named(std.fmt.comptimePrint("andThen({s})", .{@typeName(Then)}));
@@ -155,7 +144,6 @@ pub const Outcome = union(enum) {
     /// A contract that requires `self` to be valid and if it is not, the
     /// contract returned by Then.then() has to be valid
     pub fn orThen(comptime self: @This(), comptime Then: type) @This() {
-        //require(isThenContract(Then));
         if (self == .Valid)
             return self.clone();
         return Then.then().named(std.fmt.comptimePrint("orThen({s})", .{@typeName(Then)}));
@@ -348,16 +336,23 @@ test "isType" {
     }
 }
 
-pub fn hasDecl(comptime T: type, name: []const u8) Outcome {
-    require(isType(T, .Struct).orElse(isType(T, .Enum).orElse(isType(T, .Union).orElse(isType(T, .Opaque)))));
+pub fn hasDecl(comptime T: type, comptime name: []const u8) Outcome {
+    const ti = @typeInfo(T);
+    const validType = ti == .Struct or ti == .Enum or ti == .Union or ti == .Opaque;
 
-    return Outcome.init(@hasDecl(T, name), Invalid{
+    const valid = if (validType) @hasDecl(T, name) else false;
+    const reason = if (validType) "declaration not found" else std.fmt.comptimePrint("{s} is not a struct, enum, union or an opaque type", .{T});
+
+    return Outcome.init(valid, Invalid{
         .identifier = std.fmt.comptimePrint("hasDecl({}, {s})", .{ T, name }),
+        .reason = reason,
     });
 }
 
 test "hasDecl" {
     comptime {
+        try expect(hasDecl(u8, "a") == .Invalid);
+        try expect(std.mem.eql(u8, hasDecl(u8, "a").Invalid.reason, "u8 is not a struct, enum, union or an opaque type"));
         try expect(hasDecl(struct {}, "a") == .Invalid);
         try expect(hasDecl(struct {
             const a = 1;
