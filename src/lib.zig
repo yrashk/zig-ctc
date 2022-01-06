@@ -336,6 +336,8 @@ test "isType" {
     }
 }
 
+/// A contract that requires that a given type is a struct,
+/// enum, union or an opaque type that has a declaration by the given name.
 pub fn hasDecl(comptime T: type, comptime name: []const u8) Outcome {
     const ti = @typeInfo(T);
     const validType = ti == .Struct or ti == .Enum or ti == .Union or ti == .Opaque;
