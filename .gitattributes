@@ -1,5 +1,5 @@
 * text=auto
-*.zig text eol=lf # See https://github.com/ziglang/zig-spec/issues/38
+*.zig text eol=lf
 zig.mod text eol=lf
 zigmod.* text eol=lf
 zig.mod linguist-language=YAML
