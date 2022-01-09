@@ -54,18 +54,18 @@ pub const Valid = struct {
 pub const Invalid = struct {
     identifier: Identifier,
 
-    /// outcomes that caused this outcome to be invalid
-    /// (primarily concerns composite outcomes)
-    causes: []const Outcome = &[0]Outcome{},
+    /// contracts that caused this contract to be invalid
+    /// (primarily concerns composite contracts)
+    causes: []const Contract = &[0]Contract{},
 
     /// reason for violation
     reason: []const u8 = "none given",
 
-    /// Returns the first outcome that causes this outcome's failure
-    pub fn cause(comptime self: @This()) Outcome {
+    /// Returns the first contract that causes this contract's failure
+    pub fn cause(comptime self: @This()) Contract {
         if (self.causes.len > 0)
             return self.causes[0].Invalid.cause();
-        return Outcome.init(false, self.clone());
+        return Contract.init(false, self.clone());
     }
 
     fn clone(self: @This()) @This() {
@@ -77,8 +77,8 @@ pub const Invalid = struct {
     }
 };
 
-/// Outcome of a contract
-pub const Outcome = union(enum) {
+/// Contract 
+pub const Contract = union(enum) {
     Valid: Valid,
     Invalid: Invalid,
 
@@ -91,7 +91,7 @@ pub const Outcome = union(enum) {
     }
 
     fn clone(comptime self: @This()) @This() {
-        return Outcome.init(
+        return @This().init(
             self == .Valid,
             (if (self == .Valid) Invalid{
                 .identifier = self.identifier(),
@@ -129,7 +129,7 @@ pub const Outcome = union(enum) {
     pub fn andAlso(comptime self: @This(), comptime t: @This()) @This() {
         return @This().init(self == .Valid and t == .Valid, Invalid{
             .identifier = std.fmt.comptimePrint("{s}.andAlso({s})", .{ self.identifier(), t.identifier() }),
-            .causes = @This().collectFailures(self, t),
+            .causes = self.collectFailures(t),
         });
     }
 
@@ -153,61 +153,61 @@ pub const Outcome = union(enum) {
     pub fn orElse(comptime self: @This(), comptime t: @This()) @This() {
         return @This().init(self == .Valid or t == .Valid, Invalid{
             .identifier = std.fmt.comptimePrint("{s}.orElse({s})", .{ self.identifier(), t.identifier() }),
-            .causes = Outcome.collectFailures(t, self),
+            .causes = t.collectFailures(self),
         });
     }
 
-    /// Gives an outcome a new identifier, wrapping the original outcome as a cause
+    /// Gives a contract a new identifier, wrapping the original contract as a cause
     ///
     /// Useful for creating named contracts that compose other contracts together
     ///
     /// ```
-    /// pub fn isMyThing(compile T: type) contracts.Outcome {
+    /// pub fn isMyThing(compile T: type) contracts.Contract {
     ///     return contracts.isType(T, .Struct).named("isMyThing");
     /// }
     /// ```
     pub fn named(comptime self: @This(), identifier_: []const u8) @This() {
-        return @This().init(self == .Valid, Invalid{ .identifier = identifier_, .causes = &[1]Outcome{self} });
+        return @This().init(self == .Valid, Invalid{ .identifier = identifier_, .causes = &[1]@This(){self} });
     }
 };
 
 test "andAlso" {
     comptime {
         const T = u8;
-        const valid_outcome = is(T, u8).andAlso(is(T, u8));
-        try expect(valid_outcome == .Valid);
+        const valid_contract = is(T, u8).andAlso(is(T, u8));
+        try expect(valid_contract == .Valid);
 
-        const outcome = is(T, u8).andAlso(is(T, u16));
-        try expect(outcome == .Invalid);
+        const contract = is(T, u8).andAlso(is(T, u16));
+        try expect(contract == .Invalid);
 
-        try expect(std.mem.eql(u8, "is(u8, u8).andAlso(is(u8, u16))", outcome.identifier()));
-        try expect(outcome.Invalid.causes.len == 1);
+        try expect(std.mem.eql(u8, "is(u8, u8).andAlso(is(u8, u16))", contract.identifier()));
+        try expect(contract.Invalid.causes.len == 1);
 
-        try expect(std.mem.eql(u8, outcome.Invalid.causes[0].identifier(), is(T, u16).identifier()));
+        try expect(std.mem.eql(u8, contract.Invalid.causes[0].identifier(), is(T, u16).identifier()));
     }
 }
 
 test "andThen" {
     comptime {
         var a = 1;
-        const outcome = is(u8, u8).andThen(struct {
-            pub fn then() Outcome {
+        const contract = is(u8, u8).andThen(struct {
+            pub fn then() Contract {
                 a = 2;
                 return is(u8, u16);
             }
         });
-        try expect(outcome == .Invalid);
+        try expect(contract == .Invalid);
         // andThen got to executed
         try expect(a == 2);
 
-        const outcome1 = is(u8, u16).andThen(struct {
-            pub fn then() Outcome {
+        const contract1 = is(u8, u16).andThen(struct {
+            pub fn then() Contract {
                 a = 3;
                 return is(u8, u16);
             }
         });
 
-        try expect(outcome1 == .Invalid);
+        try expect(contract1 == .Invalid);
         // andThen didn't get to execute
         try expect(a == 2);
     }
@@ -216,47 +216,47 @@ test "andThen" {
 test "orElse" {
     comptime {
         const T = u8;
-        const valid_outcome = is(T, u8).orElse(is(T, u16));
-        try expect(valid_outcome == .Valid);
+        const valid_contract = is(T, u8).orElse(is(T, u16));
+        try expect(valid_contract == .Valid);
 
-        const outcome = is(T, u1).orElse(is(T, u17));
-        try expect(outcome == .Invalid);
+        const contract = is(T, u1).orElse(is(T, u17));
+        try expect(contract == .Invalid);
 
-        try expect(std.mem.eql(u8, "is(u8, u1).orElse(is(u8, u17))", outcome.identifier()));
-        try expect(outcome.Invalid.causes.len == 2);
+        try expect(std.mem.eql(u8, "is(u8, u1).orElse(is(u8, u17))", contract.identifier()));
+        try expect(contract.Invalid.causes.len == 2);
 
-        try expect(std.mem.eql(u8, outcome.Invalid.causes[0].identifier(), is(T, u17).identifier()));
-        try expect(std.mem.eql(u8, outcome.Invalid.causes[1].identifier(), is(T, u1).identifier()));
+        try expect(std.mem.eql(u8, contract.Invalid.causes[0].identifier(), is(T, u17).identifier()));
+        try expect(std.mem.eql(u8, contract.Invalid.causes[1].identifier(), is(T, u1).identifier()));
     }
 }
 
 test "orThen" {
     comptime {
         var a = 1;
-        const outcome = is(u8, u8).orThen(struct {
-            pub fn then() Outcome {
+        const contract = is(u8, u8).orThen(struct {
+            pub fn then() Contract {
                 a = 2;
                 return is(u8, u16);
             }
         });
-        try expect(outcome == .Valid);
+        try expect(contract == .Valid);
         // orThen didn't get executed
         try expect(a == 1);
 
-        const outcome1 = is(u8, u16).orThen(struct {
-            pub fn then() Outcome {
+        const contract1 = is(u8, u16).orThen(struct {
+            pub fn then() Contract {
                 a = 2;
                 return is(u8, u16);
             }
         });
 
-        try expect(outcome1 == .Invalid);
+        try expect(contract1 == .Invalid);
         //// orThen got to execute
         try expect(a == 2);
     }
 }
 
-test "invalid outcome cause" {
+test "invalid contract cause" {
     comptime {
         const T = u8;
         try expect(std.mem.eql(
@@ -265,38 +265,38 @@ test "invalid outcome cause" {
             is(T, u16).Invalid.cause().identifier(),
         ));
 
-        const outcome = is(T, u8).andAlso(is(T, u16));
-        try expect(outcome == .Invalid);
+        const contract = is(T, u8).andAlso(is(T, u16));
+        try expect(contract == .Invalid);
         try expect(std.mem.eql(
             u8,
             is(T, u16).identifier(),
-            outcome.Invalid.cause().identifier(),
+            contract.Invalid.cause().identifier(),
         ));
         try expect(std.mem.eql(
             u8,
-            outcome.Invalid.reason,
-            outcome.Invalid.cause().Invalid.reason,
+            contract.Invalid.reason,
+            contract.Invalid.cause().Invalid.reason,
         ));
 
-        const custom_reason = Outcome{ .Invalid = .{ .identifier = "custom", .reason = "custom" } };
+        const custom_reason = Contract{ .Invalid = .{ .identifier = "custom", .reason = "custom" } };
         try expect(std.mem.eql(u8, custom_reason.Invalid.reason, custom_reason.Invalid.cause().Invalid.reason));
 
-        const nested = (Outcome{ .Valid = .{ .identifier = "1" } })
+        const nested = (Contract{ .Valid = .{ .identifier = "1" } })
             .andAlso(
-            (Outcome{ .Valid = .{ .identifier = "2" } })
-                .andAlso(Outcome{ .Invalid = .{ .identifier = "3", .reason = "special" } }),
+            (Contract{ .Valid = .{ .identifier = "2" } })
+                .andAlso(Contract{ .Invalid = .{ .identifier = "3", .reason = "special" } }),
         );
         try expect(std.mem.eql(u8, "3", nested.Invalid.cause().identifier()));
         try expect(std.mem.eql(u8, "special", nested.Invalid.cause().Invalid.reason));
     }
 }
 
-test "Outcome.named" {
+test "Contract.named" {
     comptime {
-        const outcome = is(u8, u16).named("contract");
-        try expect(outcome == .Invalid);
-        try expect(std.mem.eql(u8, "contract", outcome.identifier()));
-        try expect(std.mem.eql(u8, "is(u8, u16)", outcome.Invalid.cause().identifier()));
+        const contract = is(u8, u16).named("contract");
+        try expect(contract == .Invalid);
+        try expect(std.mem.eql(u8, "contract", contract.identifier()));
+        try expect(std.mem.eql(u8, "is(u8, u16)", contract.Invalid.cause().identifier()));
     }
 }
 
@@ -325,9 +325,9 @@ fn isGenericFnEqual(comptime T: type, comptime T1: type) bool {
 }
 
 /// A contract that requires type `T` to be the same type as `T1`
-pub fn is(comptime T: type, comptime T1: type) Outcome {
+pub fn is(comptime T: type, comptime T1: type) Contract {
     const valid = if (isGenericFn(T) == .Valid and isGenericFn(T1) == .Valid) isGenericFnEqual(T, T1) else T == T1;
-    return Outcome.init(valid, Invalid{
+    return Contract.init(valid, Invalid{
         .identifier = std.fmt.comptimePrint("is({}, {})", .{ T, T1 }),
     });
 }
@@ -346,12 +346,12 @@ test "is" {
 }
 
 /// A contract that requires function type T be generic
-pub fn isGenericFn(comptime T: type) Outcome {
+pub fn isGenericFn(comptime T: type) Contract {
     comptime {
         const identifier = std.fmt.comptimePrint("isGenericFn({})", .{T});
         return isType(T, .Fn).andThen(struct {
-            pub fn then() Outcome {
-                return Outcome.init(@typeInfo(T).Fn.is_generic, Invalid{ .identifier = identifier });
+            pub fn then() Contract {
+                return Contract.init(@typeInfo(T).Fn.is_generic, Invalid{ .identifier = identifier });
             }
         }).named(identifier);
     }
@@ -369,8 +369,8 @@ test "isGenericFn" {
 /// type (as in .Struct, .Int, etc.)
 ///
 /// Includes violation reason into `Invalid.reason`
-pub fn isType(comptime T: type, comptime type_id: std.builtin.TypeId) Outcome {
-    return Outcome.init(@typeInfo(T) == type_id, Invalid{
+pub fn isType(comptime T: type, comptime type_id: std.builtin.TypeId) Contract {
+    return Contract.init(@typeInfo(T) == type_id, Invalid{
         .identifier = std.fmt.comptimePrint("isType({}, .{s})", .{ T, @tagName(type_id) }),
         .reason = std.fmt.comptimePrint("got .{s}", .{@tagName(@typeInfo(T))}),
     });
@@ -387,14 +387,14 @@ test "isType" {
 
 /// A contract that requires that a given type is a struct,
 /// enum, union or an opaque type that has a declaration by the given name.
-pub fn hasDecl(comptime T: type, comptime name: []const u8) Outcome {
+pub fn hasDecl(comptime T: type, comptime name: []const u8) Contract {
     const ti = @typeInfo(T);
     const validType = ti == .Struct or ti == .Enum or ti == .Union or ti == .Opaque;
 
     const valid = if (validType) @hasDecl(T, name) else false;
     const reason = if (validType) "declaration not found" else std.fmt.comptimePrint("{s} is not a struct, enum, union or an opaque type", .{T});
 
-    return Outcome.init(valid, Invalid{
+    return Contract.init(valid, Invalid{
         .identifier = std.fmt.comptimePrint("hasDecl({}, {s})", .{ T, name }),
         .reason = reason,
     });
@@ -428,9 +428,9 @@ test "hasDecl" {
 
 /// A contract that requires that a given type is a struct,
 /// enum, union or an opaque type that has a struct declaration by the given name.
-pub fn hasStruct(comptime T: type, comptime name: []const u8) Outcome {
+pub fn hasStruct(comptime T: type, comptime name: []const u8) Contract {
     return hasDecl(T, name).andThen(struct {
-        pub fn then() Outcome {
+        pub fn then() Contract {
             return isType(@field(T, name), .Struct);
         }
     })
@@ -469,9 +469,9 @@ test "hasStruct" {
 
 /// A contract that requires that a given type is a struct,
 /// enum, union or an opaque type that has a function declaration by the given name.
-pub fn hasFn(comptime T: type, comptime name: []const u8) Outcome {
+pub fn hasFn(comptime T: type, comptime name: []const u8) Contract {
     return hasDecl(T, name).andThen(struct {
-        pub fn then() Outcome {
+        pub fn then() Contract {
             return isType(@TypeOf(@field(T, name)), .Fn);
         }
     })
@@ -508,23 +508,23 @@ test "hasFn" {
     }
 }
 
-fn isEquivalent_(comptime A: type, comptime B: type) Outcome {
+fn isEquivalent_(comptime A: type, comptime B: type) Contract {
     return hasStruct(A, "contracts")
         .andThen(struct {
-        pub fn then() Outcome {
+        pub fn then() Contract {
             comptime {
                 return hasFn(@field(A, "contracts"), "isEquivalent");
             }
         }
     })
         .andThen(struct {
-        pub fn then() Outcome {
+        pub fn then() Contract {
             return is(@TypeOf(A.contracts.isEquivalent), fn (type) bool);
         }
     })
         .andThen(struct {
-        pub fn then() Outcome {
-            return Outcome.init(A.contracts.isEquivalent(B), Invalid{
+        pub fn then() Contract {
+            return Contract.init(A.contracts.isEquivalent(B), Invalid{
                 .identifier = std.fmt.comptimePrint("{s}.contracts.isEquivalent({s})", .{ A, B }),
             });
         }
@@ -554,7 +554,7 @@ fn isEquivalent_(comptime A: type, comptime B: type) Outcome {
 ///
 /// assert(isEquivalent(A, B) == .Valid);
 /// ```
-pub fn isEquivalent(comptime A: type, comptime B: type) Outcome {
+pub fn isEquivalent(comptime A: type, comptime B: type) Contract {
     return isEquivalent_(A, B).orElse(isEquivalent_(B, A));
 }
 
@@ -582,33 +582,33 @@ test "isEquivalent" {
     }
 }
 
-/// Requires an outcome to be valid, throws a compile-time error otherwise
-pub fn require(comptime outcome: Outcome) void {
-    if (outcome == .Invalid) {
-        const err = if (std.mem.eql(u8, outcome.identifier(), outcome.Invalid.cause().identifier()) and
-            std.mem.eql(u8, outcome.Invalid.reason, outcome.Invalid.cause().Invalid.reason))
+/// Requires a contract to be valid, throws a compile-time error otherwise
+pub fn require(comptime contract: Contract) void {
+    if (contract == .Invalid) {
+        const err = if (std.mem.eql(u8, contract.identifier(), contract.Invalid.cause().identifier()) and
+            std.mem.eql(u8, contract.Invalid.reason, contract.Invalid.cause().Invalid.reason))
             std.fmt.comptimePrint(
                 "requirement failure in {s} (reason: {s})",
                 .{
-                    outcome.identifier(),
-                    outcome.Invalid.reason,
+                    contract.identifier(),
+                    contract.Invalid.reason,
                 },
             )
         else
             std.fmt.comptimePrint(
                 "requirement failure in {s} (reason: {s}), cause: {s} (reason: {s})",
                 .{
-                    outcome.identifier(),
-                    outcome.Invalid.reason,
-                    outcome.Invalid.cause().identifier(),
-                    outcome.Invalid.cause().Invalid.reason,
+                    contract.identifier(),
+                    contract.Invalid.reason,
+                    contract.Invalid.cause().identifier(),
+                    contract.Invalid.cause().Invalid.reason,
                 },
             );
         @compileError(err);
     }
 }
 
-/// Requires an outcome to be valid, throws a compile-time error otherwise
+/// Requires a contract to be valid, throws a compile-time error otherwise
 ///
 /// Used in function signatures:
 ///
@@ -618,7 +618,7 @@ pub fn require(comptime outcome: Outcome) void {
 ///     void,
 /// ) {}
 /// ```
-pub fn RequiresAndReturns(outcome: Outcome, comptime T: type) type {
-    require(outcome);
+pub fn RequiresAndReturns(contract: Contract, comptime T: type) type {
+    require(contract);
     return T;
 }
